@@ -72,6 +72,25 @@ Function Read-RequestParameters {
     return $BatchQueryResult
 
 }
+Function Read-RequestParameterMappings {
+
+    param(
+        $BatchToReadRequestParameterMappings
+    )
+
+    $Query = "Select * from RequestParameterMappings where RequestParameterId in ($($BatchToReadRequestParameterMappings.id -join ','))"
+
+    try {
+        $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+    }
+    catch {
+        Write-Error "Failed to read to DB. Exception: $($PSItem.Exception.Message)"
+        Exit
+    }
+
+    return $BatchQueryResult
+
+}
 
 Function Export-ArchivedRequestParameters {
     param(
@@ -90,6 +109,23 @@ Function Export-ArchivedRequestParameters {
     return $OutFilename
 }
 
+Function Export-ArchivedRequestParameterMappings {
+    param(
+        $RequestParameterMappingsToArchive
+    )
+
+    $OutFilename = "ArchivedRequestParameterMappings" + (get-date -Format FileDateTimeUniversal) + ".csv"
+
+    try {
+        $RequestParameterMappingsToArchive | Export-Csv -Path .\$OutFilename -NoClobber -Encoding UTF8 -NoTypeInformation -Delimiter ";" -Append -ErrorAction Stop
+    }
+    catch {
+        Write-Error "Failed to write RequestParameterMappings to archive file. Exception: $($PSItem.Exception.Message)"
+        Exit
+    }
+    return $OutFilename
+}
+
 Function Delete-RequestParameters {
     param(
         $RequestParametersToDelete
@@ -102,31 +138,74 @@ Function Delete-RequestParameters {
         $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
     }
     catch {
-        Write-Error "Failed to read to DB. Exception: $($PSItem.Exception.Message)"
+        Write-Error "Failed to invoke sql cmd and delete RequestParameters. Exception: $($PSItem.Exception.Message)"
         Exit
     }
     
 
 }
-# Main Script
+
+Function Delete-RequestParameterMappings {
+    param(
+        $BatchToDeleteRequestParameterMappings
+    )
+
+    $Query = "delete from RequestParameterMappings where RequestParameterId in ($($BatchToDeleteRequestParameterMappings.id -join ','))"
+        
+    try {
+        $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+    }
+    catch {
+        Write-Error "Failed to invoke sql cmd and delete RequestParameterMappings. Exception: $($PSItem.Exception.Message)"
+        Exit
+    }
+
+
+}
+
+#region Main Script
 Write-Verbose "Script starting"
 Validate-Requirements
 
 # Run through the batches
 for ($i = 1; $i -le $BatchesToRun; $i++) {
     
+    # Read DB
+
     $batch = Read-RequestParameters
+    if ($null -eq $batch) {
+        Write-Information "No more RequestParameters within scope to read"
+        break
+    }
     Write-Information "Batch $i/$BatchesToRun read."
+
+    $batchMappings = Read-RequestParameterMappings -BatchToReadRequestParameterMappings $batch
+    Write-Information "Batch $i/$BatchesToRun mappings read."
+
     
+    # Export to file
+
     $OutFilename = Export-ArchivedRequestParameters -RequestParametersToArchive $batch
-    Write-Information "File [$OutFilename] written to disk."
+    Write-Information "RequestParameters file [$OutFilename] written to disk."
     
+    if ($null -ne $batchMappings) {
+        $OutFilename = Export-ArchivedRequestParameterMappings -RequestParameterMappingsToArchive $batchMappings
+        Write-Information "RequestParameterMappings file [$OutFilename] written to disk."
+    }
+
+    # Delete from DB
+
+    if ($null -ne $batchMappings) {
+        Delete-RequestParameterMappings -BatchToDeleteRequestParameterMappings $batch
+        Write-Information "RequestParameterMappings batch $i/$BatchesToRun deleted."
+    }
 
     #Delete-RequestParameters : Failed to read to DB. Exception: The DELETE statement conflicted with the REFERENCE constraint "FK_RequestParameterMappings_RequestParameters". The conflict occurred in database "SnowAutomationPlatformDomain", table "dbo.RequestParameterMappings", column 'RequestParameterId'.
     Delete-RequestParameters -RequestParametersToDelete $batch
-    Write-Information "Batch $i/$BatchesToRun deleted."
+    Write-Information "RequestParameters batch $i/$BatchesToRun deleted."
     
     
 }
 Write-Information "Batches completed"
 Write-Verbose "Script completed"
+#endregion
