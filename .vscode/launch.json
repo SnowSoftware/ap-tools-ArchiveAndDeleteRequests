@@ -11,10 +11,11 @@
             "script": "${file}",
             "args": [
                 "-APDatabaseServer '192.168.168.168,51429'",
-                "-DeleteBeforeThisDate 2023-06-01",
-                "-RequestParameterBatchSize 1000",
+                "-DeleteBeforeThisDate 2023-08-01",
+                "-RequestParameterBatchSize 3",
                 "-BatchesToRun 3",
-                "-InformationAction continue"
+                "-InformationAction continue",
+                // "-UnsafeMode"
             ]
         }
     ]

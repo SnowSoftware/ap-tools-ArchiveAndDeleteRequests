@@ -14,7 +14,10 @@ param(
 
     [Parameter(Mandatory)]
     [Int]
-    $BatchesToRun
+    $BatchesToRun,
+
+    [switch]
+    $UnsafeMode
     
 )
 
@@ -48,6 +51,9 @@ Function Validate-Requirements {
     }
     Write-Information "Database successfully queried."
 
+    if ($UnsafeMode) {
+        Write-Warning "UnsafeMode active, continuing without user confirming files written to disk."
+    }
 
 }
 
@@ -170,7 +176,7 @@ Validate-Requirements
 # Run through the batches
 for ($i = 1; $i -le $BatchesToRun; $i++) {
     
-    # Read DB
+    #region Read DB
 
     $batch = Read-RequestParameters
     if ($null -eq $batch) {
@@ -182,18 +188,59 @@ for ($i = 1; $i -le $BatchesToRun; $i++) {
     $batchMappings = Read-RequestParameterMappings -BatchToReadRequestParameterMappings $batch
     Write-Information "Batch $i/$BatchesToRun mappings read."
 
+    #endregion
     
-    # Export to file
+    #region Export to file
 
-    $OutFilename = Export-ArchivedRequestParameters -RequestParametersToArchive $batch
-    Write-Information "RequestParameters file [$OutFilename] written to disk."
+    $RequestParametersOutFilename = Export-ArchivedRequestParameters -RequestParametersToArchive $batch
+    Write-Information "RequestParameters file [$RequestParametersOutFilename] written to disk."
     
     if ($null -ne $batchMappings) {
-        $OutFilename = Export-ArchivedRequestParameterMappings -RequestParameterMappingsToArchive $batchMappings
-        Write-Information "RequestParameterMappings file [$OutFilename] written to disk."
+        $RequestParameterMappingsOutFilename = Export-ArchivedRequestParameterMappings -RequestParameterMappingsToArchive $batchMappings
+        Write-Information "RequestParameterMappings file [$RequestParameterMappingsOutFilename] written to disk."
     }
 
-    # Delete from DB
+    #endregion
+
+    #region Confirm archiving
+
+    if (!$UnsafeMode) {
+
+        
+        # User confirm RequestParameterMappings file on disk
+        if ($null -ne $batchMappings) {
+            Write-Host "Confirm file [$RequestParameterMappingsOutFilename] is written to disk correctly."
+        
+            $Continue = 'not set'
+            while ($Continue -ne 'continue' -and $Continue -ne 'abort') {
+                $Continue = Read-Host "Type 'continue' to continue, or 'abort' to abort"
+            }
+            if ($Continue -eq 'abort') {
+                Write-Information "User aborted."
+                exit
+            }
+            Write-Information "User confirmed [$RequestParameterMappingsOutFilename]."
+        }
+
+        # User confirm RequestParameter file on disk
+        Write-Host "Confirm file [$RequestParametersOutFilename] is written to disk correctly."
+        
+        $Continue = 'not set'
+        while ($Continue -ne 'continue' -and $Continue -ne 'abort') {
+            $Continue = Read-Host "Type 'continue' to continue, or 'abort' to abort"
+        }
+        if ($Continue -eq 'abort') {
+            Write-Information "User aborted."
+            exit
+        }
+        Write-Information "User confirmed [$RequestParametersOutFilename]."
+
+
+    }
+
+    #endregion
+
+    #region Delete from DB
 
     if ($null -ne $batchMappings) {
         Delete-RequestParameterMappings -BatchToDeleteRequestParameterMappings $batch
@@ -204,6 +251,7 @@ for ($i = 1; $i -le $BatchesToRun; $i++) {
     Delete-RequestParameters -RequestParametersToDelete $batch
     Write-Information "RequestParameters batch $i/$BatchesToRun deleted."
     
+    #endregion
     
 }
 Write-Information "Batches completed"
