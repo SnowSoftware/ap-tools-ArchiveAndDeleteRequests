@@ -1,3 +1,4 @@
+#Requires -Modules @{ ModuleName="SqlServer"; ModuleVersion="22.0.0" }
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
