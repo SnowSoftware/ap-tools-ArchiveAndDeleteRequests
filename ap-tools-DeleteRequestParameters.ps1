@@ -25,13 +25,13 @@ param(
 
 Function Validate-Requirements {
 
-    # Validate DeleteBeforeThisDate is older than 180 days
-    $ValidDeleteBeforeThisDate = (Get-Date).AddDays(-180)
+    # Validate DeleteBeforeThisDate is older than 365 days
+    $ValidDeleteBeforeThisDate = (Get-Date).AddDays(-365)
     if ($DeleteBeforeThisDate -gt $ValidDeleteBeforeThisDate) {
-        Write-Error "DeleteBeforeThisDate needs to be older than 180 days."
+        Write-Error "DeleteBeforeThisDate needs to be older than 365 days."
         Exit
     }
-    Write-Information "DeleteBeforeThisDate is older than 180 days."
+    Write-Information "DeleteBeforeThisDate is older than 365 days."
 
     # Validate workload and batch sizes
     $TotalBatchSize = $RequestParameterBatchSize * $BatchesToRun
