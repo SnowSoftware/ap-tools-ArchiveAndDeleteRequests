@@ -1,4 +1,5 @@
-#Requires -Modules @{ ModuleName="SqlServer"; ModuleVersion="22.0.0" }
+# Removed require to support SQLPS module as well (without TrustServerCertificate)
+# #Requires -Modules @{ ModuleName="SqlServer"; ModuleVersion="22.0.0" }
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
@@ -18,7 +19,10 @@ param(
     $BatchesToRun,
 
     [switch]
-    $UnsafeMode
+    $UnsafeMode,
+
+    [switch]
+    $DontUseTrustServerCertificate
     
 )
 
@@ -44,7 +48,12 @@ Function Validate-Requirements {
     
     # Validate SQL Access
     try {
-        $SQLAccess = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query "SELECT TOP 1 CompanyName FROM [SnowAutomationPlatformDomain].[dbo].[LicenseKeys]" -TrustServerCertificate -Verbose -ErrorAction Stop
+        if ($DontUseTrustServerCertificate) {
+            $SQLAccess = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query "SELECT TOP 1 CompanyName FROM [SnowAutomationPlatformDomain].[dbo].[LicenseKeys]" -Verbose -ErrorAction Stop
+        }
+        else {
+            $SQLAccess = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query "SELECT TOP 1 CompanyName FROM [SnowAutomationPlatformDomain].[dbo].[LicenseKeys]" -TrustServerCertificate -Verbose -ErrorAction Stop
+        }
     }
     catch {
         Write-Error "Failed to connect to DB. Exception: $($PSItem.Exception.Message)"
@@ -69,7 +78,12 @@ Function Read-RequestParameters {
     AND r.RequestingUserID != 'MISSITO_SCHEDULED_TASK'"
 
     try {
-        $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        if ($DontUseTrustServerCertificate) {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+        }
+        else {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        }
     }
     catch {
         Write-Error "Failed to read to DB. Exception: $($PSItem.Exception.Message)"
@@ -88,7 +102,12 @@ Function Read-RequestParameterMappings {
     $Query = "Select * from RequestParameterMappings where RequestParameterId in ($($BatchToReadRequestParameterMappings.id -join ','))"
 
     try {
-        $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        if ($DontUseTrustServerCertificate) {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+        }
+        else {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        }
     }
     catch {
         Write-Error "Failed to read to DB. Exception: $($PSItem.Exception.Message)"
@@ -142,7 +161,12 @@ Function Delete-RequestParameters {
     $Query = "delete from RequestParameters where Id in ($($RequestParametersToDelete.id -join ','))"
         
     try {
-        $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        if ($DontUseTrustServerCertificate) {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+        }
+        else {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        }
     }
     catch {
         Write-Error "Failed to invoke sql cmd and delete RequestParameters. Exception: $($PSItem.Exception.Message)"
@@ -160,7 +184,12 @@ Function Delete-RequestParameterMappings {
     $Query = "delete from RequestParameterMappings where RequestParameterId in ($($BatchToDeleteRequestParameterMappings.id -join ','))"
         
     try {
-        $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        if ($DontUseTrustServerCertificate) {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+        }
+        else {
+            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        }
     }
     catch {
         Write-Error "Failed to invoke sql cmd and delete RequestParameterMappings. Exception: $($PSItem.Exception.Message)"
