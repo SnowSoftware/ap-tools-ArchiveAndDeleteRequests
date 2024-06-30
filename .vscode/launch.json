@@ -11,7 +11,7 @@
             "script": "${file}",
             "args": [
                 "-APDatabaseServer 'SnowAutomationPlatformSQLServer'",
-                "-ArchiveOnlyRequestsOlderThanThis 2020-01-01",
+                "-ArchiveOnlyRequestsOlderThanThis 2019-01-01",
                 "-HowManyRequestsToArchiveAndDelete 1",
                 "-InformationAction continue"
                 // "-UnsafeMode"
