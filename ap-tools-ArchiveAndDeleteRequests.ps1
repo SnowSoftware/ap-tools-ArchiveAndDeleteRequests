@@ -23,11 +23,11 @@ param(
     [Parameter(Mandatory)]
     [ValidateScript({
             $inputAmount = $_
-            if ($inputAmount -le 100) {
+            if ($inputAmount -le 500) {
                 $true
             }
             else {
-                throw "HowManyRequestsToArchiveAndDelete must be 100 or less"
+                throw "HowManyRequestsToArchiveAndDelete must be 500 or less"
             }
         })]
     [Int]
@@ -97,6 +97,7 @@ function Read-APtable {
             $Query = "SELECT top $HowManyRequestsToArchiveAndDelete r.* FROM Requests r 
             where RequestingUserID != 'MISSITO_SCHEDULED_TASK'
 	        and DateCreated < '$ArchiveOnlyRequestsOlderThanThis'
+            and Status != 0
 	        order by DateCreated asc"
         }
 
@@ -298,6 +299,7 @@ function Read-APTableArchiveFile {
 }
 
 function Delete-FromAPTable {
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [ValidateSet('Requests',
@@ -318,22 +320,49 @@ function Delete-FromAPTable {
         $Ids
     )
 
-    $Query = "delete from $Table where Id in ($($Ids -join ','))"
-        
-    try {
-        if ($DontUseTrustServerCertificate) {
-            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
-        }
-        else {
-            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
-        }
-    }
-    catch {
-        Write-Error "Failed to invoke sql cmd and delete RequestParameters. Exception: $($PSItem.Exception.Message)"
-        Exit
-    }
-    Write-Warning "[$Table] got [$($Ids.count)] ID in  deleted"
 
+    # Define batch size
+    $batchSize = 10000
+
+    # Calculate number of batches
+    $batchCount = [Math]::Ceiling($Ids.Count / $batchSize)
+
+    for ($i = 0; $i -lt $batchCount; $i++) {
+        # Get the current batch
+        $start = $i * $batchSize
+        $end = $start + $batchSize - 1
+        $batchIds = $Ids[$start..$end]
+
+      
+        $Query = "delete from $Table where Id in ($($batchIds -join ','))"
+        
+        if ($Table -eq 'ServiceInstances') {
+            $Query = "DELETE FROM ServiceInstances
+            WHERE Id IN ($($batchIds -join ',')) AND Id NOT IN (
+            SELECT ServiceInstance_Id FROM ServiceInstance_Requests where ServiceInstance_Id IS NOT NULL
+            );"
+        }
+        
+        
+        
+        try {
+            if ($DontUseTrustServerCertificate) {
+                $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+            }
+            else {
+                $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+            }
+        }
+        catch {
+            Write-Error "Failed to invoke sql cmd and delete RequestParameters. Exception: $($PSItem.Exception.Message)"
+            Exit
+        }
+    
+    }
+    
+    
+    Write-Warning "[$Table] got [$($Ids.count)] ID in  deleted"
+    
 }
 #endregion
 
@@ -374,17 +403,20 @@ function Archive-APTableManualProcess {
             if ($ServiceInstance_Requests.Count -le 0) { return }
 
             # ServiceInstances
-            $ServiceInstances = Read-APtable -Table ServiceInstances
-            $ServiceInstancesSchema = Read-APtableSchema -Table ServiceInstances
-            Export-APTableArchive -TableObject $ServiceInstances -Table ServiceInstances
-            Export-APTableArchive -TableObject $ServiceInstancesSchema -Table ServiceInstances -IsSchema
-    
-            # InstanceAttributes
-            $InstanceAttributes = Read-APtable -Table InstanceAttributes
-            $InstanceAttributesSchema = Read-APtableSchema -Table InstanceAttributes
-            Export-APTableArchive -TableObject $InstanceAttributes -Table InstanceAttributes
-            Export-APTableArchive -TableObject $InstanceAttributesSchema -Table InstanceAttributes -IsSchema
-    
+            if (($ServiceInstance_Requests.ServiceInstance_Id | Where-Object { -not [string]::IsNullOrEmpty($_) }).Count -gt 0) {
+
+                $ServiceInstances = Read-APtable -Table ServiceInstances
+                $ServiceInstancesSchema = Read-APtableSchema -Table ServiceInstances
+                Export-APTableArchive -TableObject $ServiceInstances -Table ServiceInstances
+                Export-APTableArchive -TableObject $ServiceInstancesSchema -Table ServiceInstances -IsSchema
+                
+                # InstanceAttributes
+                $InstanceAttributes = Read-APtable -Table InstanceAttributes
+                $InstanceAttributesSchema = Read-APtableSchema -Table InstanceAttributes
+                Export-APTableArchive -TableObject $InstanceAttributes -Table InstanceAttributes
+                Export-APTableArchive -TableObject $InstanceAttributesSchema -Table InstanceAttributes -IsSchema
+            }
+                
         
             # RequestActivities
             $RequestActivities = Read-APtable -Table RequestActivities
@@ -512,7 +544,12 @@ function Delete-APTableManualProcess {
         # ServiceInstances
         $ServiceInstancesArchive = Read-APTableArchiveFile -Table ServiceInstances
         if ($ServiceInstancesArchive) {
-            Delete-FromAPTable -Table ServiceInstances -Ids $ServiceInstancesArchive.Id
+            try {
+                Delete-FromAPTable -Table ServiceInstances -Ids $ServiceInstancesArchive.Id -ErrorAction Stop
+            }
+            catch {
+                Write-Host "why does this fail?"
+            }
         }
 
         # RequestUpdates
@@ -523,7 +560,7 @@ function Delete-APTableManualProcess {
 
         # RequestStatusLogs
         $RequestStatusLogsArchive = Read-APTableArchiveFile -Table RequestStatusLogs
-        if ($RequestStatusLogsArchive) {
+        if ($RequestStatusLogsArchive) { 
             Delete-FromAPTable -Table RequestStatusLogs -Ids $RequestStatusLogsArchive.Id
         }
 
