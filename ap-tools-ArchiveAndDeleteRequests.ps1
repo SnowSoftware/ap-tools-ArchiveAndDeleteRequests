@@ -23,11 +23,11 @@ param(
     [Parameter(Mandatory)]
     [ValidateScript({
             $inputAmount = $_
-            if ($inputAmount -le 500) {
+            if ($inputAmount -le 300) {
                 $true
             }
             else {
-                throw "HowManyRequestsToArchiveAndDelete must be 500 or less"
+                throw "HowManyRequestsToArchiveAndDelete must be 300 or less"
             }
         })]
     [Int]
