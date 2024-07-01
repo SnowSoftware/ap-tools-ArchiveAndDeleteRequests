@@ -10,11 +10,10 @@
             "request": "launch",
             "script": "${file}",
             "args": [
-                "-APDatabaseServer '192.168.168.168,51429'",
-                "-DeleteBeforeThisDate 2023-08-01",
-                "-RequestParameterBatchSize 3",
-                "-BatchesToRun 3",
-                "-InformationAction continue",
+                "-APDatabaseServer 'SnowAutomationPlatformSQLServer'",
+                "-ArchiveOnlyRequestsOlderThanThis 2019-01-01",
+                "-HowManyRequestsToArchiveAndDelete 500",
+                "-InformationAction continue"
                 // "-UnsafeMode"
             ]
         }
