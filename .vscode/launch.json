@@ -12,7 +12,7 @@
             "args": [
                 "-APDatabaseServer 'SnowAutomationPlatformSQLServer'",
                 "-ArchiveOnlyRequestsOlderThanThis 2019-01-01",
-                "-HowManyRequestsToArchiveAndDelete 500",
+                "-HowManyRequestsToArchiveAndDelete 100",
                 "-InformationAction continue"
                 // "-UnsafeMode"
             ]
