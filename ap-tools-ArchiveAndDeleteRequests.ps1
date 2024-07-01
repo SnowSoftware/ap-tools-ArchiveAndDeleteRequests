@@ -544,12 +544,7 @@ function Delete-APTableManualProcess {
         # ServiceInstances
         $ServiceInstancesArchive = Read-APTableArchiveFile -Table ServiceInstances
         if ($ServiceInstancesArchive) {
-            try {
-                Delete-FromAPTable -Table ServiceInstances -Ids $ServiceInstancesArchive.Id -ErrorAction Stop
-            }
-            catch {
-                Write-Host "why does this fail?"
-            }
+            Delete-FromAPTable -Table ServiceInstances -Ids $ServiceInstancesArchive.Id -ErrorAction Stop
         }
 
         # RequestUpdates
@@ -580,6 +575,8 @@ function Delete-APTableManualProcess {
 }
 #endregion
 
+
+
 #region MAIN SCRIPT
 
 Validate-AP-sql-db-access
@@ -591,4 +588,5 @@ Archive-APTableManualProcess
 Delete-APTableManualProcess
 
 Write-Information "Script done."
+
 #endregion END SCRIPT
