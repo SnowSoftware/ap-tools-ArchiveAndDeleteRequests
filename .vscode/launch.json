@@ -5,16 +5,32 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "PowerShell: Launch Current File",
+            "name": "RunMultipleBatchesArchiveAndDelete.ps1",
             "type": "PowerShell",
             "request": "launch",
-            "script": "${file}",
+            "script": ".\\ap-tools-RunMultipleBatchesArchiveAndDelete.ps1",
             "args": [
                 "-APDatabaseServer 'SnowAutomationPlatformSQLServer'",
-                "-ArchiveOnlyRequestsOlderThanThis 2019-01-01",
-                "-HowManyRequestsToArchiveAndDelete 100",
-                "-InformationAction continue"
+                "-ArchiveOnlyRequestsOlderThanThis 2022-01-01",
+                "-HowManyRequestsToArchiveAndDelete 300",
+                // "-InformationAction continue"
+                "-UnsafeMode",
+                "-BatchCount 300"
+                // "-DontUseTrustServerCertificate"
+            ]
+        },
+        {
+            "name": "ArchiveAndDeleteRequests.ps1",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": ".\\ap-tools-ArchiveAndDeleteRequests.ps1",
+            "args": [
+                "-APDatabaseServer 'SnowAutomationPlatformSQLServer'",
+                "-ArchiveOnlyRequestsOlderThanThis 2016-01-01",
+                "-HowManyRequestsToArchiveAndDelete 30",
+                // "-InformationAction continue"
                 // "-UnsafeMode"
+                // "-DontUseTrustServerCertificate"
             ]
         }
     ]

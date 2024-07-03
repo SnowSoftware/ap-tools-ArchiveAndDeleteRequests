@@ -54,8 +54,8 @@ function Validate-AP-sql-db-access {
         }
     }
     catch {
-        Write-Error "Failed to connect to DB. Exception: $($PSItem.Exception.Message)"
-        Exit
+        # Write-Error "Failed to connect to DB. Exception: $($PSItem.Exception.Message)"
+        throw $PSItem.Exception
     }
     Write-Information "Database successfully queried."
 }
@@ -63,13 +63,14 @@ function Validate-AP-sql-db-access {
 function Setup-ArchivePathFolder {
     $batchname = "ManualRequestsArchive" + (get-date -Format FileDateTimeUniversal)
     try {
-        $ArchiveFolder = New-Item -Path $($ArchivePath + '\') -Name $batchname -ItemType Directory
-
+        $ArchiveFolder = New-Item -Path $($ArchivePath + '\') -Name $batchname -ItemType Directory -ErrorAction Stop
     }
     catch {
-        Write-Error "Could not create archive folder. Exception: $($PSItem.Exception.Message)"
-        exit
+        # Write-Error "Could not create archive folder. Exception: $($PSItem.Exception.Message)"
+        throw $PSItem.Exception
     }
+
+    Write-Host "ArchiveFolder: [$($ArchiveFolder.FullName)]"
 
     return $ArchiveFolder
 }
@@ -138,28 +139,65 @@ function Read-APtable {
             where al.RequestActivity_Id in ($($RequestActivities.Id -join ','))"
         }
         RequestParameterMappings {
-            $Query = "SELECT rpm.* FROM RequestParameterMappings rpm 
-            where rpm.RequestParameterId in ($($RequestParameters.Id -join ','))"
+        # Batch management because RequestParameters are often more than allowed by SQL in "exists in" array statement
+
+
+                    # Define batch size
+                    $batchSize = 40000
+
+                    # Calculate number of batches
+                    $batchCount = [Math]::Ceiling($RequestParameters.Count / $batchSize)
+
+                    $queries = @()
+
+                    for ($i = 0; $i -lt $batchCount; $i++) {
+                        # Get the current batch
+                        $start = $i * $batchSize
+                        $end = $start + $batchSize - 1
+
+                        $queries += "SELECT rpm.* FROM RequestParameterMappings rpm 
+                                    where rpm.RequestParameterId in ($($RequestParameters[$start..$end].Id -join ','))"
+
+                    }
+
+            # $Query = "SELECT rpm.* FROM RequestParameterMappings rpm 
+            # where rpm.RequestParameterId in ($($RequestParameters.Id -join ','))"
         }
 
         Default {
             Write-Error "No Table defined."
-            exit
+            throw "No Table defined for Read-APTable."
         }
     }
 
 
 
     try {
-        if ($DontUseTrustServerCertificate) {
-            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
-        }
-        else {
-            $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+        if ($Table -eq 'RequestParameterMappings') {
+
+            $BatchQueryResult = @()
+            foreach($Query in $queries) {
+                if ($DontUseTrustServerCertificate) {
+                    $BatchQueryResult += Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+                }
+                else {
+                    $BatchQueryResult += Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+                }
+            }
+
+
+        } else {
+
+            if ($DontUseTrustServerCertificate) {
+                $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
+            }
+            else {
+                $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -TrustServerCertificate -Verbose -ErrorAction Stop
+            }
         }
     }
     catch {
-        Write-Error "Failed to read to DB. Exception: $($PSItem.Exception.Message)"
+        throw "Failed to read to DB. Exception: $($PSItem.Exception.Message)"
         Exit
     }
 
@@ -209,7 +247,7 @@ Function Export-APTableArchive {
         $TableObject | Export-Csv -Path $OutFilename -NoClobber -Encoding UTF8 -NoTypeInformation -Delimiter "," -Append -ErrorAction Stop
     }
     catch {
-        Write-Error "Failed to write RequestParameters to archive file. Exception: $($PSItem.Exception.Message)"
+        throw "Failed to write RequestParameters to archive file. Exception: $($PSItem.Exception.Message)"
         Exit
     }
     return $OutFilename
@@ -354,14 +392,14 @@ function Delete-FromAPTable {
             }
         }
         catch {
-            Write-Error "Failed to invoke sql cmd and delete RequestParameters. Exception: $($PSItem.Exception.Message)"
+            throw "Failed to invoke sql cmd and delete Ids from table. Exception: $($PSItem.Exception.Message)"
             Exit
         }
     
     }
     
     
-    Write-Warning "[$Table] got [$($Ids.count)] ID in  deleted"
+    Write-Warning "[$Table] got [$($Ids.count)] ID deleted"
     
 }
 #endregion
@@ -374,31 +412,31 @@ function Archive-APTableManualProcess {
             # Requests
             $Requests = Read-APtable -Table Requests
             $RequestsSchema = Read-APtableSchema -Table Requests
-            Export-APTableArchive -TableObject $Requests -Table Requests
-            Export-APTableArchive -TableObject $RequestsSchema -Table Requests -IsSchema
+            $null = Export-APTableArchive -TableObject $Requests -Table Requests
+            $null = Export-APTableArchive -TableObject $RequestsSchema -Table Requests -IsSchema
 
             if ($Requests.Count -le 0) { 
-                Write-Host "No Requests in scope."
-                exit 
+                # Write-Host "No Requests in scope."
+                throw "No Requests in scope."
             }
 
             # ServiceInstance_Requests
             $ServiceInstance_Requests = Read-APtable -Table ServiceInstance_Requests
             $ServiceInstance_RequestsSchema = Read-APtableSchema -Table ServiceInstance_Requests
-            Export-APTableArchive -TableObject $ServiceInstance_Requests -Table ServiceInstance_Requests
-            Export-APTableArchive -TableObject $ServiceInstance_RequestsSchema -Table ServiceInstance_Requests -IsSchema
+            $null = Export-APTableArchive -TableObject $ServiceInstance_Requests -Table ServiceInstance_Requests
+            $null = Export-APTableArchive -TableObject $ServiceInstance_RequestsSchema -Table ServiceInstance_Requests -IsSchema
 
             # RequestStatusLogs
             $RequestStatusLogs = Read-APtable -Table RequestStatusLogs
             $RequestStatusLogsSchema = Read-APtableSchema -Table RequestStatusLogs
-            Export-APTableArchive -TableObject $RequestStatusLogs -Table RequestStatusLogs
-            Export-APTableArchive -TableObject $RequestStatusLogsSchema -Table RequestStatusLogs -IsSchema
+            $null = Export-APTableArchive -TableObject $RequestStatusLogs -Table RequestStatusLogs
+            $null = Export-APTableArchive -TableObject $RequestStatusLogsSchema -Table RequestStatusLogs -IsSchema
 
             # RequestUpdates
             $RequestUpdates = Read-APtable -Table RequestUpdates
             $RequestUpdatesSchema = Read-APtableSchema -Table RequestUpdates
-            Export-APTableArchive -TableObject $RequestUpdates -Table RequestUpdates
-            Export-APTableArchive -TableObject $RequestUpdatesSchema -Table RequestUpdates -IsSchema
+            $null = Export-APTableArchive -TableObject $RequestUpdates -Table RequestUpdates
+            $null = Export-APTableArchive -TableObject $RequestUpdatesSchema -Table RequestUpdates -IsSchema
     
             if ($ServiceInstance_Requests.Count -le 0) { return }
 
@@ -407,56 +445,56 @@ function Archive-APTableManualProcess {
 
                 $ServiceInstances = Read-APtable -Table ServiceInstances
                 $ServiceInstancesSchema = Read-APtableSchema -Table ServiceInstances
-                Export-APTableArchive -TableObject $ServiceInstances -Table ServiceInstances
-                Export-APTableArchive -TableObject $ServiceInstancesSchema -Table ServiceInstances -IsSchema
+                $null = Export-APTableArchive -TableObject $ServiceInstances -Table ServiceInstances
+                $null = Export-APTableArchive -TableObject $ServiceInstancesSchema -Table ServiceInstances -IsSchema
                 
                 # InstanceAttributes
                 $InstanceAttributes = Read-APtable -Table InstanceAttributes
                 $InstanceAttributesSchema = Read-APtableSchema -Table InstanceAttributes
-                Export-APTableArchive -TableObject $InstanceAttributes -Table InstanceAttributes
-                Export-APTableArchive -TableObject $InstanceAttributesSchema -Table InstanceAttributes -IsSchema
+                $null = Export-APTableArchive -TableObject $InstanceAttributes -Table InstanceAttributes
+                $null = Export-APTableArchive -TableObject $InstanceAttributesSchema -Table InstanceAttributes -IsSchema
             }
                 
         
             # RequestActivities
             $RequestActivities = Read-APtable -Table RequestActivities
             $RequestActivitiesSchema = Read-APtableSchema -Table RequestActivities
-            Export-APTableArchive -TableObject $RequestActivities -Table RequestActivities
-            Export-APTableArchive -TableObject $RequestActivitiesSchema -Table RequestActivities -IsSchema
+            $null = Export-APTableArchive -TableObject $RequestActivities -Table RequestActivities
+            $null = Export-APTableArchive -TableObject $RequestActivitiesSchema -Table RequestActivities -IsSchema
         
             if ($RequestActivities.Count -le 0) { return }
         
             # RequestActivityStatusLogs
             $RequestActivityStatusLogs = Read-APtable -Table RequestActivityStatusLogs
             $RequestActivityStatusLogsSchema = Read-APtableSchema -Table RequestActivityStatusLogs
-            Export-APTableArchive -TableObject $RequestActivityStatusLogs -Table RequestActivityStatusLogs
-            Export-APTableArchive -TableObject $RequestActivityStatusLogsSchema -Table RequestActivityStatusLogs -IsSchema
+            $null = Export-APTableArchive -TableObject $RequestActivityStatusLogs -Table RequestActivityStatusLogs
+            $null = Export-APTableArchive -TableObject $RequestActivityStatusLogsSchema -Table RequestActivityStatusLogs -IsSchema
     
             # RequestParameters
             $RequestParameters = Read-APtable -Table RequestParameters
             $RequestParametersSchema = Read-APtableSchema -Table RequestParameters
-            Export-APTableArchive -TableObject $RequestParameters -Table RequestParameters
-            Export-APTableArchive -TableObject $RequestParametersSchema -Table RequestParameters -IsSchema
+            $null = Export-APTableArchive -TableObject $RequestParameters -Table RequestParameters
+            $null = Export-APTableArchive -TableObject $RequestParametersSchema -Table RequestParameters -IsSchema
         
             # ActivityLogs
             $ActivityLogs = Read-APtable -Table ActivityLogs
             $ActivityLogsSchema = Read-APtableSchema -Table ActivityLogs
-            Export-APTableArchive -TableObject $ActivityLogs -Table ActivityLogs
-            Export-APTableArchive -TableObject $ActivityLogsSchema -Table ActivityLogs -IsSchema
+            $null = Export-APTableArchive -TableObject $ActivityLogs -Table ActivityLogs
+            $null = Export-APTableArchive -TableObject $ActivityLogsSchema -Table ActivityLogs -IsSchema
         
             if ($RequestParameters.Count -le 0) { return }
     
             # RequestParameterMappings
             $RequestParameterMappings = Read-APtable -Table RequestParameterMappings
             $RequestParameterMappingsSchema = Read-APtableSchema -Table RequestParameterMappings
-            Export-APTableArchive -TableObject $RequestParameterMappings -Table RequestParameterMappings
-            Export-APTableArchive -TableObject $RequestParameterMappingsSchema -Table RequestParameterMappings -IsSchema
+            $null = Export-APTableArchive -TableObject $RequestParameterMappings -Table RequestParameterMappings
+            $null = Export-APTableArchive -TableObject $RequestParameterMappingsSchema -Table RequestParameterMappings -IsSchema
         }
     
     }
     catch {
-        Write-Error "General error archiving. Exception: $($PSItem.Exception.Message)"
-        exit
+        # Write-Error "General error archiving. Exception: $($PSItem.Exception.Message)"
+        throw $PSItem.Exception
     }
     Write-Information "Successfully archived."
 
@@ -472,14 +510,16 @@ function Delete-APTableManualProcess {
         }
 
         # validate files in archive folder
-        Get-ChildItem -Path $ArchiveFolder.FullName
+        if (-not $UnsafeMode) {
+            Get-ChildItem -Path $ArchiveFolder.FullName
+        }
 
         $confirm = $false
         While (($confirm -ne 'ConfirmDelete' -and $Confirm -ne 'Abort') -and -not $UnsafeMode) {
             $confirm = Read-Host "Confirm the archived files are correct and should now be deleted. Type [ConfirmDelete] to continue to delete from DB. Type [Abort] to abort. Input"
     
             if ($confirm -eq 'Abort') {
-                Write-Information "User aborted delete from DB step."
+                Throw "User aborted delete from DB step."
                 exit
             }
         }
@@ -490,7 +530,7 @@ function Delete-APTableManualProcess {
             $confirm = Read-Host "Type [ConfirmDelete] to continue to delete from DB. Type [Abort] to abort. Input"
 
             if ($confirm -eq 'Abort') {
-                Write-Information "User aborted delete from DB step."
+                throw "User aborted delete from DB step."
                 exit
             }
         }
@@ -569,7 +609,7 @@ function Delete-APTableManualProcess {
     
     }
     catch {
-        Write-Error "General error deleting. Exception: $($PSItem.Exception.Message)"
+        throw "General error deleting. Exception: $($PSItem.Exception.Message)"
         exit
     }
 }
@@ -579,14 +619,26 @@ function Delete-APTableManualProcess {
 
 #region MAIN SCRIPT
 
-Validate-AP-sql-db-access
+try {
+
+    Validate-AP-sql-db-access
     
-$ArchiveFolder = Setup-ArchivePathFolder
+    $ArchiveFolder = Setup-ArchivePathFolder
+    
+    Archive-APTableManualProcess
+    
+    Delete-APTableManualProcess
+    
+    Write-Information "Script completed."
 
-Archive-APTableManualProcess
+    return "Script completed."
 
-Delete-APTableManualProcess
-
-Write-Information "Script done."
+} catch {
+    if ($PSItem.Exception.Message -eq 'No Requests in scope.') {
+        throw $PSItem.Exception.Message
+    }
+    # Write-Error "Error thrown. Exception: $($PSItem.Exception.Message)"
+    throw $PSItem.Exception
+}
 
 #endregion END SCRIPT
