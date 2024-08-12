@@ -139,26 +139,26 @@ function Read-APtable {
             where al.RequestActivity_Id in ($($RequestActivities.Id -join ','))"
         }
         RequestParameterMappings {
-        # Batch management because RequestParameters are often more than allowed by SQL in "exists in" array statement
+            # Batch management because RequestParameters are often more than allowed by SQL in "exists in" array statement
 
 
-                    # Define batch size
-                    $batchSize = 40000
+            # Define batch size
+            $batchSize = 40000
 
-                    # Calculate number of batches
-                    $batchCount = [Math]::Ceiling($RequestParameters.Count / $batchSize)
+            # Calculate number of batches
+            $batchCount = [Math]::Ceiling(@($RequestParameters).Count / $batchSize)
 
-                    $queries = @()
+            $queries = @()
 
-                    for ($i = 0; $i -lt $batchCount; $i++) {
-                        # Get the current batch
-                        $start = $i * $batchSize
-                        $end = $start + $batchSize - 1
+            for ($i = 0; $i -lt $batchCount; $i++) {
+                # Get the current batch
+                $start = $i * $batchSize
+                $end = $start + $batchSize - 1
 
-                        $queries += "SELECT rpm.* FROM RequestParameterMappings rpm 
+                $queries += "SELECT rpm.* FROM RequestParameterMappings rpm 
                                     where rpm.RequestParameterId in ($($RequestParameters[$start..$end].Id -join ','))"
 
-                    }
+            }
 
             # $Query = "SELECT rpm.* FROM RequestParameterMappings rpm 
             # where rpm.RequestParameterId in ($($RequestParameters.Id -join ','))"
@@ -186,7 +186,8 @@ function Read-APtable {
             }
 
 
-        } else {
+        }
+        else {
 
             if ($DontUseTrustServerCertificate) {
                 $BatchQueryResult = Invoke-Sqlcmd -ServerInstance $APDatabaseServer -Database SnowAutomationPlatformDomain -Query $Query -Verbose -ErrorAction Stop
@@ -229,7 +230,7 @@ Function Export-APTableArchive {
         [switch]$IsSchema
     )
 
-    if ($TableObject.Count -le 0) {
+    if (@($TableObject).Count -le 0) {
         Write-Information "Table $Table is empty, no export."
         return
     }
@@ -322,13 +323,13 @@ function Read-APTableArchiveFile {
 
     $TableArchive = Get-ChildItem -Path $ArchiveFolder.FullName | Where-Object { $_.Name -match "Archived_$($Table)_.*\.csv" -and $_.Name -notmatch 'Schema' }
     
-    if ($TableArchive.Count -gt 1) {
+    if (@($TableArchive).Count -gt 1) {
         Write-Error "more than one archive file found for $Table."
         exit
     }
 
 
-    if ($TableArchive.Count -eq 1) {
+    if (@($TableArchive).Count -eq 1) {
         return Import-Csv -Path $TableArchive.FullName -Delimiter ','
     }
 
@@ -363,7 +364,7 @@ function Delete-FromAPTable {
     $batchSize = 10000
 
     # Calculate number of batches
-    $batchCount = [Math]::Ceiling($Ids.Count / $batchSize)
+    $batchCount = [Math]::Ceiling(@($Ids).Count / $batchSize)
 
     for ($i = 0; $i -lt $batchCount; $i++) {
         # Get the current batch
@@ -399,7 +400,7 @@ function Delete-FromAPTable {
     }
     
     
-    Write-Warning "[$Table] got [$($Ids.count)] ID deleted"
+    Write-Warning "[$Table] got [$(@($Ids).count)] ID deleted"
     
 }
 #endregion
@@ -415,7 +416,7 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $Requests -Table Requests
             $null = Export-APTableArchive -TableObject $RequestsSchema -Table Requests -IsSchema
 
-            if ($Requests.Count -le 0) { 
+            if (@($Requests).Count -le 0) { 
                 # Write-Host "No Requests in scope."
                 throw "No Requests in scope."
             }
@@ -438,10 +439,10 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $RequestUpdates -Table RequestUpdates
             $null = Export-APTableArchive -TableObject $RequestUpdatesSchema -Table RequestUpdates -IsSchema
     
-            if ($ServiceInstance_Requests.Count -le 0) { return }
+            if (@($ServiceInstance_Requests).Count -le 0) { return }
 
             # ServiceInstances
-            if (($ServiceInstance_Requests.ServiceInstance_Id | Where-Object { -not [string]::IsNullOrEmpty($_) }).Count -gt 0) {
+            if (@($ServiceInstance_Requests.ServiceInstance_Id | Where-Object { -not [string]::IsNullOrEmpty($_) }).Count -gt 0) {
 
                 $ServiceInstances = Read-APtable -Table ServiceInstances
                 $ServiceInstancesSchema = Read-APtableSchema -Table ServiceInstances
@@ -462,7 +463,7 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $RequestActivities -Table RequestActivities
             $null = Export-APTableArchive -TableObject $RequestActivitiesSchema -Table RequestActivities -IsSchema
         
-            if ($RequestActivities.Count -le 0) { return }
+            if (@($RequestActivities).Count -le 0) { return }
         
             # RequestActivityStatusLogs
             $RequestActivityStatusLogs = Read-APtable -Table RequestActivityStatusLogs
@@ -482,7 +483,7 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $ActivityLogs -Table ActivityLogs
             $null = Export-APTableArchive -TableObject $ActivityLogsSchema -Table ActivityLogs -IsSchema
         
-            if ($RequestParameters.Count -le 0) { return }
+            if (@($RequestParameters).Count -le 0) { return }
     
             # RequestParameterMappings
             $RequestParameterMappings = Read-APtable -Table RequestParameterMappings
@@ -633,7 +634,8 @@ try {
 
     return "Script completed."
 
-} catch {
+}
+catch {
     if ($PSItem.Exception.Message -eq 'No Requests in scope.') {
         throw $PSItem.Exception.Message
     }
