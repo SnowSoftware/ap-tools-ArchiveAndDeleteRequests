@@ -230,7 +230,7 @@ Function Export-APTableArchive {
         [switch]$IsSchema
     )
 
-    if (@($TableObject).Count -le 0) {
+    if (@($TableObject).Count -le 0 -or $null -eq $TableObject) {
         Write-Information "Table $Table is empty, no export."
         return
     }
@@ -248,7 +248,7 @@ Function Export-APTableArchive {
         $TableObject | Export-Csv -Path $OutFilename -NoClobber -Encoding UTF8 -NoTypeInformation -Delimiter "," -Append -ErrorAction Stop
     }
     catch {
-        throw "Failed to write RequestParameters to archive file. Exception: $($PSItem.Exception.Message)"
+        throw "Failed to write $TableObject to archive file. Exception: $($PSItem.Exception.Message)"
         Exit
     }
     return $OutFilename
@@ -329,7 +329,7 @@ function Read-APTableArchiveFile {
     }
 
 
-    if (@($TableArchive).Count -eq 1) {
+    if (@($TableArchive).Count -eq 1 -and $null -ne $TableArchive) {
         return Import-Csv -Path $TableArchive.FullName -Delimiter ','
     }
 
@@ -416,7 +416,7 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $Requests -Table Requests
             $null = Export-APTableArchive -TableObject $RequestsSchema -Table Requests -IsSchema
 
-            if (@($Requests).Count -le 0) { 
+            if (@($Requests).Count -le 0 -or $null -eq $Requests) { 
                 # Write-Host "No Requests in scope."
                 throw "No Requests in scope."
             }
@@ -439,10 +439,11 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $RequestUpdates -Table RequestUpdates
             $null = Export-APTableArchive -TableObject $RequestUpdatesSchema -Table RequestUpdates -IsSchema
     
-            if (@($ServiceInstance_Requests).Count -le 0) { return }
+            if (@($ServiceInstance_Requests).Count -le 0 -or $null -eq $ServiceInstance_Requests) { return }
 
             # ServiceInstances
-            if (@($ServiceInstance_Requests.ServiceInstance_Id | Where-Object { -not [string]::IsNullOrEmpty($_) }).Count -gt 0) {
+            $ServiceInstance_RequestsWithServiceInstanceId = @($ServiceInstance_Requests.ServiceInstance_Id | Where-Object { -not [string]::IsNullOrEmpty($_) })
+            if ($ServiceInstance_RequestsWithServiceInstanceId.Count -gt 0 -or $null -eq $ServiceInstance_RequestsWithServiceInstanceId) {
 
                 $ServiceInstances = Read-APtable -Table ServiceInstances
                 $ServiceInstancesSchema = Read-APtableSchema -Table ServiceInstances
@@ -463,7 +464,7 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $RequestActivities -Table RequestActivities
             $null = Export-APTableArchive -TableObject $RequestActivitiesSchema -Table RequestActivities -IsSchema
         
-            if (@($RequestActivities).Count -le 0) { return }
+            if (@($RequestActivities).Count -le 0 -or $null -eq $RequestActivities) { return }
         
             # RequestActivityStatusLogs
             $RequestActivityStatusLogs = Read-APtable -Table RequestActivityStatusLogs
@@ -483,7 +484,7 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $ActivityLogs -Table ActivityLogs
             $null = Export-APTableArchive -TableObject $ActivityLogsSchema -Table ActivityLogs -IsSchema
         
-            if (@($RequestParameters).Count -le 0) { return }
+            if (@($RequestParameters).Count -le 0 -or $null -eq $RequestParameters) { return }
     
             # RequestParameterMappings
             $RequestParameterMappings = Read-APtable -Table RequestParameterMappings
