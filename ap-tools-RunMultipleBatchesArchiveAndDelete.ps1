@@ -41,15 +41,19 @@ param(
     $DontUseTrustServerCertificate,
 
     [int]
-    $batchCount
+    $batchCount,
+
+    [switch]
+    $OlderThanAP310
     
 )
 
 for ($i = 1; $i -le $batchCount; $i++) {
     try {
         Write-Host "Running Batch $i / $batchCount"
-        $result = . '.\ap-tools-ArchiveAndDeleteRequests.ps1' -APDatabaseServer $APDatabaseServer -ArchiveOnlyRequestsOlderThanThis $ArchiveOnlyRequestsOlderThanThis -HowManyRequestsToArchiveAndDelete $HowManyRequestsToArchiveAndDelete -UnsafeMode:$UnsafeMode -DontUseTrustServerCertificate:$DontUseTrustServerCertificate -InformationAction:$InformationPreference
-    } catch {
+        $result = . '.\ap-tools-ArchiveAndDeleteRequests.ps1' -APDatabaseServer $APDatabaseServer -ArchiveOnlyRequestsOlderThanThis $ArchiveOnlyRequestsOlderThanThis -HowManyRequestsToArchiveAndDelete $HowManyRequestsToArchiveAndDelete -UnsafeMode:$UnsafeMode -DontUseTrustServerCertificate:$DontUseTrustServerCertificate -InformationAction:$InformationPreference -OlderThanAP310:$OlderThanAP310
+    }
+    catch {
         if ($PSItem.Exception.Message -eq 'No Requests in scope.') {
             Write-Host $PSItem.Exception.Message
             break

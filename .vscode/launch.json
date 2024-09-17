@@ -17,6 +17,7 @@
                 "-UnsafeMode",
                 "-BatchCount 300"
                 // "-DontUseTrustServerCertificate"
+                // "-OlderThanAP310"
             ]
         },
         {
@@ -31,6 +32,7 @@
                 // "-InformationAction continue"
                 // "-UnsafeMode"
                 // "-DontUseTrustServerCertificate"
+                // "-OlderThanAP310"
             ]
         }
     ]

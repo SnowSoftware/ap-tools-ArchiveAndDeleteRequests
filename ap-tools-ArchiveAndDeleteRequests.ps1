@@ -40,7 +40,10 @@ param(
     $UnsafeMode,
 
     [switch]
-    $DontUseTrustServerCertificate
+    $DontUseTrustServerCertificate,
+
+    [switch]
+    $OlderThanAP310
     
 )
 #region Support functions
@@ -485,7 +488,9 @@ function Archive-APTableManualProcess {
             $null = Export-APTableArchive -TableObject $ActivityLogsSchema -Table ActivityLogs -IsSchema
         
             if (@($RequestParameters).Count -le 0 -or $null -eq $RequestParameters) { return }
-    
+            
+            if ($OlderThanAP310) { return }
+
             # RequestParameterMappings
             $RequestParameterMappings = Read-APtable -Table RequestParameterMappings
             $RequestParameterMappingsSchema = Read-APtableSchema -Table RequestParameterMappings
